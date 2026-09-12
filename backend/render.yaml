@@ -1,0 +1,23 @@
+services:
+  - type: web
+    name: eld-trip-planner-api
+    runtime: python
+    plan: free
+    buildCommand: "./build.sh"
+    startCommand: "gunicorn eldproject.wsgi:application"
+    envVars:
+      - key: DJANGO_DEBUG
+        value: "False"
+      - key: DJANGO_SECRET_KEY
+        generateValue: true
+      - key: DJANGO_ALLOWED_HOSTS
+        value: ".onrender.com"
+      - key: CORS_ALLOW_ALL
+        value: "True"
+      - key: PYTHON_VERSION
+        value: "3.12.3"
+      # Set your MongoDB connection string in the Render dashboard (kept secret).
+      - key: MONGODB_URI
+        sync: false
+      - key: MONGODB_DB_NAME
+        value: "eld_trip_planner"

@@ -1,0 +1,21 @@
+# Secrets — never commit the real .env (only .env.example is tracked)
+.env
+.env.*
+!.env.example
+
+# Python / Django
+__pycache__/
+*.py[cod]
+*.egg-info/
+db.sqlite3
+db.sqlite3-journal
+staticfiles/
+media/
+*.log
+local_settings.py
+
+# Virtual environments
+venv/
+.venv/
+env/
+ENV/
