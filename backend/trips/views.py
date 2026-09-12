@@ -69,8 +69,11 @@ def plan(request):
         "num_days": result["summary"]["num_days"],
         "result": result,
     }
-    trip_id = get_repository().save(doc)
-    result["trip_id"] = trip_id
+    try:
+        result["trip_id"] = get_repository().save(doc)
+    except Exception:
+        # Still return the planned route/logs if persistence is down.
+        result["trip_id"] = None
     return Response(result, status=status.HTTP_200_OK)
 
 
@@ -85,4 +88,7 @@ def trip_detail(request, pk):
 
 @api_view(["GET"])
 def trip_list(request):
-    return Response(get_repository().list(limit=50))
+    try:
+        return Response(get_repository().list(limit=50))
+    except Exception:
+        return Response([])
