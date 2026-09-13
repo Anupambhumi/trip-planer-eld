@@ -14,15 +14,33 @@ function fmtDate(iso) {
 }
 const short = (s) => (s || "").split(",").slice(0, 2).join(",");
 
+function routeKey(trip) {
+  return [
+    (trip.current_location || "").split(",")[0].trim().toLowerCase(),
+    (trip.pickup_location || "").split(",")[0].trim().toLowerCase(),
+    (trip.dropoff_location || "").split(",")[0].trim().toLowerCase(),
+    String(trip.created_at || "").slice(0, 16),
+  ].join("|");
+}
+
 function mergeTrips(remote, local) {
-  const seen = new Set();
   const out = [];
-  for (const trip of [...(local || []), ...(remote || [])]) {
-    const id = String(trip.id);
-    if (!id || seen.has(id)) continue;
-    seen.add(id);
+  const seenIds = new Set();
+  const seenRoutes = new Set();
+
+  const push = (trip) => {
+    const id = String(trip.id || trip.server_id || "");
+    const route = routeKey(trip);
+    if (id && seenIds.has(id)) return;
+    if (route !== "|||" && seenRoutes.has(route)) return;
+    if (id) seenIds.add(id);
+    if (trip.server_id) seenIds.add(String(trip.server_id));
+    if (route !== "|||") seenRoutes.add(route);
     out.push(trip);
-  }
+  };
+
+  (local || []).forEach(push);
+  (remote || []).forEach((trip) => push({ ...trip, server_id: trip.id }));
   return out.sort((a, b) => String(b.created_at || "").localeCompare(String(a.created_at || "")));
 }
 
@@ -31,7 +49,7 @@ export default function Trips() {
   const [error, setError] = useState("");
   const { trip: active, setTrip, history } = useTrip();
   const nav = useNavigate();
-  const activeId = active?.trip_id || active?.local_id;
+  const activeId = active?.local_id || active?.trip_id;
 
   useEffect(() => {
     const local = history?.length ? history : loadHistory();
@@ -45,13 +63,19 @@ export default function Trips() {
 
   const open = async (item) => {
     try {
-      if (item.result) {
-        setTrip({ ...item.result, trip_id: item.result.trip_id || item.id });
-        nav("/");
-        return;
+      let full = item.result;
+      if (!full && item.server_id) {
+        full = await getTrip(item.server_id);
+      } else if (!full) {
+        full = await getTrip(item.id);
       }
-      const full = await getTrip(item.id);
-      setTrip({ ...full, trip_id: item.id });
+      setTrip({
+        ...full,
+        trip_id: full.trip_id || item.server_id || item.id,
+        local_id: item.id?.startsWith?.("local-") ? item.id : (full.local_id || item.id),
+        saved_at: item.created_at,
+        server_id: item.server_id,
+      });
       nav("/");
     } catch (e) { setError(e.message); }
   };
@@ -59,7 +83,10 @@ export default function Trips() {
   return (
     <div className="page">
       <h1 className="page-title">All Trips</h1>
-      <p className="page-sub">Browse planned trips from this browser and the saved database. Click a trip to load it on the dashboard.</p>
+      <p className="page-sub">
+        Browse planned trips from this browser and the saved database.
+        {trips?.length ? ` ${trips.length} trip${trips.length === 1 ? "" : "s"} saved.` : " Click a trip to load it on the dashboard."}
+      </p>
 
       {error && <div className="error">{error}</div>}
       {!trips && !error && <div className="empty">Loading trips…</div>}

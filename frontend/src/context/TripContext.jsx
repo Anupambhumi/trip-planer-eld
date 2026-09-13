@@ -3,7 +3,7 @@ import React, { createContext, useContext, useState } from "react";
 const TripContext = createContext(null);
 const ACTIVE_KEY = "trippilot.activeTrip";
 const HISTORY_KEY = "trippilot.tripHistory";
-const HISTORY_LIMIT = 25;
+const HISTORY_LIMIT = 50;
 
 function loadJson(key, fallback) {
   try {
@@ -23,14 +23,27 @@ function writeJson(key, value) {
   }
 }
 
+function newLocalId() {
+  return `local-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function slimResult(result) {
+  if (!result) return result;
+  const route = result.route
+    ? { ...result.route, geometry: [] }
+    : result.route;
+  return { ...result, route, charts: undefined };
+}
+
 function toHistoryEntry(result) {
   const inputs = result.inputs || {};
   const summary = result.summary || {};
   const header = inputs.log_header || {};
-  const localId = result.local_id || result.trip_id || `local-${Date.now()}`;
+  const localId = result.local_id || newLocalId();
   const created = result.saved_at || new Date().toISOString();
   return {
-    id: result.trip_id || localId,
+    id: localId,
+    server_id: result.trip_id || result.server_id || null,
     created_at: created,
     current_location: inputs.current_location || "",
     pickup_location: inputs.pickup_location || "",
@@ -41,36 +54,58 @@ function toHistoryEntry(result) {
     total_miles: summary.total_miles,
     total_drive_hours: summary.total_drive_hours,
     num_days: summary.num_days,
-    result,
+    result: slimResult({ ...result, local_id: localId }),
+  };
+}
+
+function persistHistory(entries) {
+  let next = entries.slice(0, HISTORY_LIMIT);
+  for (let attempt = 0; attempt < 10; attempt += 1) {
+    if (writeJson(HISTORY_KEY, next)) return next;
+    next = next.map((item, index) => (
+      index === 0 ? item : { ...item, result: undefined }
+    ));
+    if (attempt >= 3) next = next.slice(0, Math.max(1, next.length - 1));
+  }
+  return next;
+}
+
+function normalizeEntry(item) {
+  if (!item || !item.id) return null;
+  if (String(item.id).startsWith("local-")) return item;
+  return {
+    ...item,
+    server_id: item.server_id || item.id,
+    id: `local-migrated-${item.id}-${item.created_at || newLocalId()}`,
   };
 }
 
 export function loadHistory() {
-  const items = loadJson(HISTORY_KEY, []);
+  const items = (loadJson(HISTORY_KEY, []) || []).map(normalizeEntry).filter(Boolean);
   const active = loadJson(ACTIVE_KEY, null);
   if (!active) return items;
-  const activeId = active.trip_id || active.local_id;
+  const activeId = active.local_id;
   if (activeId && items.some((item) => String(item.id) === String(activeId))) {
     return items;
   }
-  return [toHistoryEntry(active), ...items].slice(0, HISTORY_LIMIT);
+  return persistHistory([toHistoryEntry(active), ...items]);
 }
 
 function rememberTrip(result) {
   if (!result) return result;
-  const localId = result.local_id || result.trip_id || `local-${Date.now()}`;
+  const isNewPlan = !result.local_id;
+  const localId = result.local_id || newLocalId();
   const stored = {
     ...result,
     local_id: localId,
-    saved_at: result.saved_at || new Date().toISOString(),
+    saved_at: isNewPlan ? new Date().toISOString() : (result.saved_at || new Date().toISOString()),
   };
   const entry = toHistoryEntry(stored);
-  const next = [entry, ...loadHistory().filter((item) => String(item.id) !== String(entry.id))]
-    .slice(0, HISTORY_LIMIT);
-  if (!writeJson(HISTORY_KEY, next)) {
-    const slim = next.map((item, index) => (index === 0 ? item : { ...item, result: undefined }));
-    writeJson(HISTORY_KEY, slim);
-  }
+  const existing = loadHistory();
+  const next = isNewPlan
+    ? [entry, ...existing]
+    : [entry, ...existing.filter((item) => String(item.id) !== String(localId))];
+  persistHistory(next);
   return stored;
 }
 
@@ -86,7 +121,7 @@ export function TripProvider({ children }) {
       if (stored) localStorage.setItem(ACTIVE_KEY, JSON.stringify(stored));
       else localStorage.removeItem(ACTIVE_KEY);
     } catch {
-      /* ignore quota errors */
+      writeJson(ACTIVE_KEY, slimResult(stored));
     }
   };
 
