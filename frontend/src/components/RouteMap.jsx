@@ -40,8 +40,8 @@ export default function RouteMap({ route, stops, height = 460 }) {
           {stops.filter((s) => s.lat != null).map((s, i) => (
             <CircleMarker key={i} center={[s.lat, s.lon]}
               radius={big.has(s.type) ? 9 : 6}
-              pathOptions={{ color: "#070d1c", weight: 2,
-                fillColor: COLORS[s.type] || "#8aa0c0", fillOpacity: 1 }}>
+              pathOptions={{ color: "#ffffff", weight: 2,
+                fillColor: COLORS[s.type] || "#64748b", fillOpacity: 1 }}>
               <Tooltip>
                 <b>{s.label}</b><br />
                 {s.mile != null && <>Mile {s.mile} · </>}{s.arrive_time}

@@ -473,10 +473,14 @@ a { color: inherit; text-decoration: none; }
 /* ---------- Map ---------- */
 .map-box { border-radius: var(--radius); overflow: hidden; padding: 6px; }
 .map-box .leaflet-container { border-radius: calc(var(--radius) - 6px); }
-.leaflet-container { height: 460px; width: 100%; background: #0a1526; }
-.leaflet-tooltip { background: rgba(10, 18, 36, 0.9); color: var(--ink);
-  border: 1px solid var(--glass-border); border-radius: 10px;
-  box-shadow: 0 12px 30px -10px rgba(0, 0, 0, 0.7); }
+.leaflet-container { height: 460px; width: 100%; background: #e8eef5; }
+.leaflet-tooltip {
+  background: rgba(255, 255, 255, 0.96) !important;
+  color: var(--ink) !important;
+  border: 1px solid rgba(15, 40, 80, 0.12) !important;
+  border-radius: 10px;
+  box-shadow: 0 12px 28px -12px rgba(15, 40, 80, 0.28);
+}
 .leaflet-tooltip-top::before, .leaflet-tooltip-bottom::before,
 .leaflet-tooltip-left::before, .leaflet-tooltip-right::before { display: none; }
 .legend { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 16px; }
