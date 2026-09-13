@@ -131,13 +131,25 @@ def _try_mongo():
         return None
 
 
+def _ensure_orm_schema():
+    """Create the trips table if this host skipped migrate (common on Render)."""
+    from django.core.management import call_command
+    from django.db import connection
+    if "trips_trip" not in connection.introspection.table_names():
+        call_command("migrate", interactive=False, verbosity=0)
+
+
 def get_repository():
     """Pick MongoDB if reachable, otherwise the ORM. Cached after first call."""
     global _repo
     if _repo is not None:
         return _repo
     client = _try_mongo()
-    _repo = MongoTripRepository(client) if client else OrmTripRepository()
+    if client:
+        _repo = MongoTripRepository(client)
+        return _repo
+    _ensure_orm_schema()
+    _repo = OrmTripRepository()
     return _repo
 
 
